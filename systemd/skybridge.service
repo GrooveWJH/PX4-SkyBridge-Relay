@@ -1,0 +1,12 @@
+[Unit]
+Description=PX4 SkyBridge Relay
+After=network.target
+
+[Service]
+Type=forking
+WorkingDirectory=/home/groove/work/PX4-SkyBridge-Relay
+ExecStart=/usr/bin/env bash /home/groove/work/PX4-SkyBridge-Relay/scripts/start_bridge.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

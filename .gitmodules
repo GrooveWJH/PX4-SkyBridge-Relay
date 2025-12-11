@@ -1,0 +1,3 @@
+[submodule "thirdparty/mavlink-router"]
+	path = thirdparty/mavlink-router
+	url = https://github.com/mavlink-router/mavlink-router.git

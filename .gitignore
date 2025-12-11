@@ -1,0 +1,12 @@
+/*/build/
+thirdparty/mavlink-router/build/
+thirdparty/mavlink-router/.git/
+thirdparty/mavlink-router/meson-info/
+thirdparty/mavlink-router/.sconsign.dblite
+.idea/
+*.swp
+.DS_Store
+
+# logs / temp
+*.log
+*.tmp
