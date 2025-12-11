@@ -9,22 +9,16 @@ PX4 SkyBridge Relay documents how to operate a companion computer as a transpare
 
 ## Requirements
 
-On the companion computer, install the build-time dependencies plus `socat`: the latter remains necessary for the UART tunnel even though `mavlink-router` is compiled from source.
+Clone the repository with its submodules and install the build-time dependencies plus `socat` (the UART tunnel still relies on it):
 
 ```bash
+git clone https://github.com/GrooveWJH/PX4-SkyBridge-Relay.git --recursive
+cd PX4-SkyBridge-Relay
 sudo apt update
 sudo apt install git meson ninja-build pkg-config gcc g++ systemd socat
 ```
 
 Ensure the local user belongs to the `dialout` group so it can open `/dev/ttyACM0` and `/dev/ttyUSB0` without elevated privileges.
-
-## Third-party dependencies
-
-The repository now contains `thirdparty/mavlink-router` as a Git submodule. Initialize it before building:
-
-```bash
-git submodule update --init --recursive thirdparty/mavlink-router
-```
 
 ## Building `mavlink-router` from source
 

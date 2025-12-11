@@ -9,22 +9,14 @@
 
 ## 依赖
 
-在伴随计算机上安装编译时所需的工具以及 `socat`（后者仍用于 UART 隧道）：
-
 ```bash
+git clone https://github.com/GrooveWJH/PX4-SkyBridge-Relay.git --recursive
+cd PX4-SkyBridge-Relay
 sudo apt update
 sudo apt install git meson ninja-build pkg-config gcc g++ systemd socat
 ```
 
 请确保运行时用户属于 `dialout` 组，以无需 sudo 即可打开 `/dev/ttyACM0` 与 `/dev/ttyUSB0`。
-
-## 第三方依赖
-
-仓库中已经将 `thirdparty/mavlink-router` 作为 Git 子模块包含，构建前请先初始化它：
-
-```bash
-git submodule update --init --recursive thirdparty/mavlink-router
-```
 
 ## 从源码构建 `mavlink-router`
 
