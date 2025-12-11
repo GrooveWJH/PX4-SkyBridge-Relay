@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DEFAULT_DEST="$(cd "$(dirname "$0")/.." && pwd)/thirdparty/mavlink-router"
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+DEFAULT_DEST="$ROOT_DIR/thirdparty/mavlink-router"
+DEFAULT_BUILD="$ROOT_DIR/build/mavlink-router"
 DEST=${DEST:-$DEFAULT_DEST}
+BUILD_DIR=${BUILD_DIR:-$DEFAULT_BUILD}
 REF=${MAVLINK_ROUTER_REF:-}
 
 if [[ ! -d "$DEST" ]]; then
@@ -21,7 +24,8 @@ fi
 
 git submodule update --init --recursive
 
-meson setup build . --wipe
-ninja -C build
+rm -rf "$BUILD_DIR"
+meson setup "$BUILD_DIR" "$DEST" --wipe
+ninja -C "$BUILD_DIR"
 
-echo "[SkyBridge] Built binary available at ${DEST}/build/src/mavlink-routerd"
+echo "[SkyBridge] Built binary available at ${BUILD_DIR}/src/mavlink-routerd"

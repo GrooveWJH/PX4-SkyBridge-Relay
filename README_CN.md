@@ -5,7 +5,7 @@
 ## 架构
 
 - **MAVLink 通道**：伴随计算机通过 `mavlink-routerd` 将 `/dev/ttyACM0`（PX4 USB CDC）以 UDP 服务的形式暴露在 `14550` 端口，Ground Control Station 可直接订阅来自飞控的心跳与控制信息。
-- **串口到 TCP 隧道**：`/dev/ttyUSB0` 上通常承载 DDS 或 `nsh` 的原始串口数据，`scripts/start_bridge.sh` 利用 `socat` 将其映射到 TCP `8888`，保持字节流的透明性，供远端主机复原为伪终端。
+- **串口到 TCP 隧道**：`/dev/ttyUSB0` 上通常承载 DDS 或 `nsh` 的原始串口数据，`scripts/bridge_control.sh`（通过 `start` 命令）利用 `socat` 将其映射到 TCP `8888`，保持字节流的透明性，供远端主机复原为伪终端。
 
 ## 依赖
 
@@ -26,7 +26,7 @@ sudo apt install git meson ninja-build pkg-config gcc g++ systemd socat
 scripts/build_mavlink_router.sh
 ```
 
-如需自定义目录或 ref，可先设置 `DEST` 或 `MAVLINK_ROUTER_REF` 环境变量。脚本结束后会输出构建好的二进制位置（`${DEST:-thirdparty/mavlink-router}/build/src/mavlink-routerd`），可通过 `-c /path/to/config/main.conf` 启动它验证各端点是否正常，然后将 `MAVLINK_ROUTER_BIN` 指向该文件，再运行 `scripts/start_bridge.sh`。
+如需自定义目录或 ref，可先设置 `DEST` 或 `MAVLINK_ROUTER_REF` 环境变量。脚本结束后会输出构建好的二进制位置（默认 `build/mavlink-router/src/mavlink-routerd`），可通过 `-c /path/to/config/main.conf` 启动它验证各端点是否正常。`scripts/bridge_control.sh` 默认会使用这个位置（除非你通过 `MAVLINK_ROUTER_BIN` 指向其它路径），所以通常无需手动导出环境变量。
 
 ## 配置文件说明（`config/main.conf`）
 
@@ -49,13 +49,14 @@ Port = 14550
 - `[General]`：全局设置。解除 `Log` 注释即可将日志写入指定目录。
 - `[UartEndpoint px4_usb]`：针对 PX4 USB CDC 设备定义了设备路径和波特率。若需通过路由暴露其他串口，可复制该块并修改属性。
 - `[UdpEndpoint qgc_lan]`：以服务器模式在所有接口监听 14550 端口，等待地面站建立连接。首次收到数据后会将 MAVLink 包返回发送者地址。
+- `/dev/ttyUSB0` 的处理由 `scripts/bridge_control.sh` 内的 `socat` 完成（通过 `start` 命令）：它把原始 UART 流保持不变地转发到 TCP 8888，局域网内的其他主机可以根据需要将这一路由封装成 UDP，或者在本地创建伪终端再供 DDS/nsh 使用；而 MAVLink 路由器继续负责 `/dev/ttyACM0` 的 UDP 服务。
 
-你可以在该文件中添加更多 `UdpEndpoint`/`TcpEndpoint` 配置来支持多客户端或 TCP 连接；修改后重新启动 `scripts/start_bridge.sh` 即可生效。
+你可以在该文件中添加更多 `UdpEndpoint`/`TcpEndpoint` 配置来支持多客户端或 TCP 连接；修改后重新启动 `scripts/bridge_control.sh start` 即可生效。
 
 ## 伴随计算机端（服务端）
 
 1. 按需修订 `/etc/mavlink-router/main.conf`（可参考 `config/main.conf`）。
-2. 执行 `scripts/start_bridge.sh`：
+2. 通过 `scripts/bridge_control.sh start` 启动：
    - 启动 `mavlink-routerd`（依据配置文件或内联端点）。
    - 以后台方式运行 `socat`，将 `/dev/ttyUSB0` 映射到 TCP `8888`。
 3. 若需在系统启动时自动运行，可将 `systemd/skybridge.service` 拷贝到 `/etc/systemd/system`，调整路径后启用该服务。
@@ -82,6 +83,8 @@ MicroXRCEAgent serial --dev /tmp/ttyVIRT_DDS -b 921600
 
 当 DDS 客户端退出后，`socat` 也会结束，从而断开 TCP 隧道。
 
+3. 在启动地面站前可以先运行 `scripts/test_udp_connection.sh` 来确认 MAVLink UDP 14550 在本机或远端是否有流量（脚本会先发送握手，监听 15 秒并输出抓到的报文片段）。
+
 ## Systemd 集成（可选）
 
 将 `systemd/skybridge.service` 复制到 `/etc/systemd/system`，根据所在路径调整 `WorkingDirectory` 与 `ExecStart`，然后启用服务：
@@ -100,11 +103,12 @@ sudo systemctl daemon-reload && sudo systemctl enable --now skybridge
 
 ## 脚本说明
 
-- `scripts/start_bridge.sh`：启动 `mavlink-routerd`（优先使用 `MAVLINK_ROUTER_BIN`）并运行 `socat` 将 `/dev/ttyUSB0` 透传到 TCP。
-- `scripts/build_mavlink_router.sh`：在子模块 `thirdparty/mavlink-router` 中运行 Meson/Ninja 构建，可通过 `MAVLINK_ROUTER_REF` 指定 ref，并输出 `build/src/mavlink-routerd` 供 `scripts/start_bridge.sh` 使用。
+- `scripts/bridge_control.sh`：通过 `start|stop|status|toggle|restart` 管理 `mavlink-routerd` 和 `socat`，并打印当前进程状态。
+- `scripts/build_mavlink_router.sh`：在子模块 `thirdparty/mavlink-router` 中运行 Meson/Ninja 构建，可通过 `MAVLINK_ROUTER_REF` 指定 ref，并输出 `build/src/mavlink-routerd` 供 `scripts/bridge_control.sh` 使用。
+- `scripts/test_udp_connection.sh`：Python 3 脚本，向 UDP 14550 发一个握手再监听 15 秒，将收到的 MAVLink 报文以十六进制打印出来，便于验证 UDP 流。
 
-使用前请将两个脚本设为可执行：
+使用前请将脚本设为可执行：
 
 ```bash
-chmod +x scripts/start_bridge.sh scripts/build_mavlink_router.sh
+chmod +x scripts/bridge_control.sh scripts/build_mavlink_router.sh scripts/test_udp_connection.sh
 ```

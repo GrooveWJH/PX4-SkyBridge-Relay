@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=forking
 WorkingDirectory=/home/groove/work/PX4-SkyBridge-Relay
-ExecStart=/usr/bin/env bash /home/groove/work/PX4-SkyBridge-Relay/scripts/start_bridge.sh
+ExecStart=/usr/bin/env bash /home/groove/work/PX4-SkyBridge-Relay/scripts/bridge_control.sh start
 Restart=on-failure
 
 [Install]

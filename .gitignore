@@ -1,7 +1,9 @@
 /*/build/
+build/
 thirdparty/mavlink-router/build/
 thirdparty/mavlink-router/.git/
 thirdparty/mavlink-router/meson-info/
+run/
 thirdparty/mavlink-router/.sconsign.dblite
 .idea/
 *.swp
