@@ -1,3 +1,12 @@
 [submodule "thirdparty/mavlink-router"]
 	path = thirdparty/mavlink-router
 	url = https://github.com/mavlink-router/mavlink-router.git
+[submodule "thirdparty/ser2net"]
+	path = thirdparty/ser2net
+	url = https://github.com/cminyard/ser2net.git
+[submodule "thirdparty/remserial"]
+	path = thirdparty/remserial
+	url = https://github.com/bradfitz/remserial-mirror.git
+[submodule "thirdparty/gensio"]
+	path = thirdparty/gensio
+	url = https://github.com/cminyard/gensio.git

@@ -11,7 +11,7 @@ DDS_DEV=${DDS_DEV:-/dev/ttyUSB0}
 BAUD=${BAUD:-921600}
 DDS_PORT=${DDS_PORT:-8888}
 MAV_PORT=${MAV_PORT:-14550}
-DEFAULT_MAVLINK_BIN="$ROOT_DIR/build/mavlink-router/src/mavlink-routerd"
+DEFAULT_MAVLINK_BIN="$ROOT_DIR/build/bin/mavlink-routerd"
 MAVLINK_ROUTER_BIN=${MAVLINK_ROUTER_BIN:-$DEFAULT_MAVLINK_BIN}
 
 ACTION=${1:-status}
@@ -85,7 +85,7 @@ function start_dds_tunnel() {
   fi
 
   echo "[SkyBridge] Starting DDS serial tunnel on TCP port $DDS_PORT"
-  nohup socat TCP-LISTEN:"$DDS_PORT",fork,reuseaddr FILE:"$DDS_DEV",b"$BAUD",raw,echo=0 >/dev/null 2>&1 &
+  nohup socat TCP-LISTEN:"$DDS_PORT",fork,reuseaddr,tcp-nodelay FILE:"$DDS_DEV",b"$BAUD",raw,echo=0 >/dev/null 2>&1 &
   write_pid "$DDS_PID_FILE" $!
   echo "[SkyBridge] DDS tunnel PID $(dds_pid)"
 }
