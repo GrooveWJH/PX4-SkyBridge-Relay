@@ -23,23 +23,27 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Cache mavlink-router builddir
+        uses: actions/cache@v4
+        with:
+          path: build/mavlink-router
+          key: ${{ runner.os }}-mavrouter-${{ hashFiles('thirdparty/mavlink-router/**') }}
+
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            build-essential \
-            meson \
-            ninja-build \
-            pkg-config \
-            autoconf \
-            automake \
             libtool \
-            libtool-bin \
-            libyaml-dev \
-            python3
+            libtool-bin
           libtool --version
 
       - name: Build project
         run: |
           chmod +x build.sh
           ./build.sh
+
+      - name: Upload mavlink-routerd
+        uses: actions/upload-artifact@v4
+        with:
+          name: mavlink-routerd-${{ matrix.runner.name }}
+          path: build/bin/mavlink-routerd
