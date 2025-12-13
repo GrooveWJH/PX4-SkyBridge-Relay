@@ -34,8 +34,10 @@ jobs:
             autoconf \
             automake \
             libtool \
+            libtool-bin \
             libyaml-dev \
             python3
+          libtool --version
 
       - name: Build project
         run: |
