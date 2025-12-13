@@ -1,16 +1,3 @@
 [submodule "thirdparty/mavlink-router"]
 	path = thirdparty/mavlink-router
 	url = https://github.com/mavlink-router/mavlink-router.git
-	ignore = dirty
-[submodule "thirdparty/ser2net"]
-	path = thirdparty/ser2net
-	url = https://github.com/cminyard/ser2net.git
-	ignore = dirty
-[submodule "thirdparty/remserial"]
-	path = thirdparty/remserial
-	url = https://github.com/bradfitz/remserial-mirror.git
-	ignore = dirty
-[submodule "thirdparty/gensio"]
-	path = thirdparty/gensio
-	url = https://github.com/cminyard/gensio.git
-	ignore = dirty

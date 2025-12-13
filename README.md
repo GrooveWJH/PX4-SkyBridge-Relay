@@ -1,8 +1,5 @@
 # PX4 SkyBridge Relay
 
-[![Build amd64](https://img.shields.io/github/actions/workflow/status/GrooveWJH/PX4-SkyBridge-Relay/build.yml?branch=main&label=amd64)](https://github.com/GrooveWJH/PX4-SkyBridge-Relay/actions/workflows/build.yml)
-[![Build arm64](https://img.shields.io/github/actions/workflow/status/GrooveWJH/PX4-SkyBridge-Relay/build.yml?branch=main&label=arm64)](https://github.com/GrooveWJH/PX4-SkyBridge-Relay/actions/workflows/build.yml)
-
 PX4 SkyBridge Relay documents how to operate a companion computer as a transparent network bridge between a PX4 autopilot and other hosts on the LAN. The companion computer exposes the USB CDC (MAVLink) interface as an outbound UDP service and tunnels the UART interface over TCP so that remote agents can interact with the PX4 serial endpoints without direct physical access.
 
 ## Architecture
@@ -24,16 +21,16 @@ sudo apt install git meson ninja-build pkg-config gcc g++ systemd socat
 
 Ensure the local user belongs to the `dialout` group so it can open `/dev/ttyACM0` and `/dev/ttyUSB0` without elevated privileges.
 
-## Building the bundled executables
+## Building `mavlink-router` from source
 
-Run the repository-level `./build.sh` to compile every third-party binary the project relies on (`mavlink-routerd`, `ser2net`, and `remserial`). The script initializes the required submodules, builds everything under `build/`, and copies the final executables into `build/bin/`:
+Run the repository-level build helper to compile the `thirdparty/mavlink-router` submodule with Meson/Ninja. The script places the binary in `build/bin/mavlink-routerd`, which `scripts/bridge_control.sh` uses by default:
 
 ```bash
 ./build.sh
-ls build/bin
+ls build/bin/mavlink-routerd
 ```
 
-`scripts/bridge_control.sh` automatically points to `build/bin/mavlink-routerd`, while `scripts/ser2net_bridge.sh` uses `build/bin/ser2net`. Re-run the build script whenever you update the submodules or change platforms.
+Re-run the script whenever you update the submodule or switch architectures.
 
 ## Configuration reference (`config/main.conf`)
 
@@ -80,10 +77,8 @@ On any remote Linux host that consumes PX4’s UART data:
 1. Create a pseudo-terminal linked to the companion computer’s TCP tunnel (replace `<COMPANION_IP>` with the actual LAN IP):
 
 ```bash
-socat PTY,link=/tmp/ttyVIRT_DDS,raw,echo=0,waitslave TCP:<COMPANION_IP>:8888,tcp-nodelay
+socat PTY,link=/tmp/ttyVIRT_DDS,raw,echo=0 TCP:<COMPANION_IP>:8888
 ```
-
-`waitslave` waits until the PTY is opened by the agent, and `tcp-nodelay` mirrors the companion’s tunnel configuration to reduce buffering so XRCE-DDS frames arrive as intact as possible.
 
 2. Run `MicroXRCEAgent` (or other DDS client) pointing to the newly created device:
 
@@ -113,13 +108,12 @@ The unit is configured as a forking service so it can manage the background `soc
 
 ## Scripts
 
-- `build.sh`: orchestrates all third-party builds and places the resulting executables inside `build/bin/`.
+- `build.sh`: compiles `thirdparty/mavlink-router` (Meson/Ninja) and copies the resulting `mavlink-routerd` into `build/bin/`.
 - `scripts/bridge_control.sh`: manages the MAVLink router and `socat` tunnel with `start|stop|status|toggle|restart` arguments, printing each PID and current state.
-- `scripts/ser2net_bridge.sh`: supervises the RFC2217 tunnel (`ser2net`) that mirrors `/dev/ttyUSB0` onto the LAN for `remserial`.
 - `scripts/test_udp_connection.sh`: sends a MAVLink hello to UDP 14550 and listens for replies for 15 seconds (Python 3 is required) to confirm the router is broadcasting.
 
 Make the helper scripts executable before use:
 
 ```bash
-chmod +x build.sh scripts/bridge_control.sh scripts/ser2net_bridge.sh scripts/test_udp_connection.sh
+chmod +x build.sh scripts/bridge_control.sh scripts/test_udp_connection.sh
 ```
