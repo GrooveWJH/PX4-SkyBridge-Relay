@@ -1,5 +1,8 @@
 # PX4 SkyBridge Relay（中文说明）
 
+[![Build amd64](https://img.shields.io/github/actions/workflow/status/GrooveWJH/PX4-SkyBridge-Relay/build.yml?branch=main&label=amd64)](https://github.com/GrooveWJH/PX4-SkyBridge-Relay/actions/workflows/build.yml)
+[![Build arm64](https://img.shields.io/github/actions/workflow/status/GrooveWJH/PX4-SkyBridge-Relay/build.yml?branch=main&label=arm64)](https://github.com/GrooveWJH/PX4-SkyBridge-Relay/actions/workflows/build.yml)
+
 本项目介绍如何将伴随计算机配置为 PX4 飞控与局域网之间的透明桥接器。伴随计算机将 USB CDC（MAVLink）接口以 UDP 服务的形式暴露在网内，并将 UART 串口通过 TCP 隧道发送给远端主机，使其能够在不与飞控直接相连的前提下访问串口数据流。
 
 ## 架构
@@ -18,15 +21,16 @@ sudo apt install git meson ninja-build pkg-config gcc g++ systemd socat
 
 请确保运行时用户属于 `dialout` 组，以无需 sudo 即可打开 `/dev/ttyACM0` 与 `/dev/ttyUSB0`。
 
-## 从源码构建 `mavlink-router`
+## 构建项目所需的可执行文件
 
-运行 `scripts/build_mavlink_router.sh`，它会在 `thirdparty/mavlink-router` 子模块目录中执行 Meson/Ninja 构建流程，并可通过 `MAVLINK_ROUTER_REF` 指定 ref：
+仓库根目录提供 `build.sh`，一次性完成所有第三方依赖（`mavlink-routerd`、`ser2net`、`remserial` 等）的编译，并将最终二进制复制到 `build/bin/`：
 
 ```bash
-scripts/build_mavlink_router.sh
+./build.sh
+ls build/bin
 ```
 
-如需自定义目录或 ref，可先设置 `DEST` 或 `MAVLINK_ROUTER_REF` 环境变量。脚本结束后会输出构建好的二进制位置（默认 `build/mavlink-router/src/mavlink-routerd`），可通过 `-c /path/to/config/main.conf` 启动它验证各端点是否正常。`scripts/bridge_control.sh` 默认会使用这个位置（除非你通过 `MAVLINK_ROUTER_BIN` 指向其它路径），所以通常无需手动导出环境变量。
+如更新了子模块或切换新平台，请重新执行该脚本。`scripts/bridge_control.sh` 默认查找 `build/bin/mavlink-routerd`，`scripts/ser2net_bridge.sh` 也会使用 `build/bin/ser2net`。
 
 ## 配置文件说明（`config/main.conf`）
 
@@ -72,8 +76,10 @@ Port = 14550
 1. 运行以下命令，创建指向伴随计算机的虚拟串口（替换 `<COMPANION_IP>` 为实际地址）：
 
 ```bash
-socat PTY,link=/tmp/ttyVIRT_DDS,raw,echo=0 TCP:<COMPANION_IP>:8888
+socat PTY,link=/tmp/ttyVIRT_DDS,raw,echo=0,waitslave TCP:<COMPANION_IP>:8888,tcp-nodelay
 ```
+
+其中 `waitslave` 可确保 PTY 被 Agent 打开后再开始传输，`tcp-nodelay` 则与伴随端的隧道设置一致，以最大程度减少缓冲导致的 XRCE-DDS 帧破碎。
 
 2. 启动 `MicroXRCEAgent` 或其他 DDS 客户端，指向 `/tmp/ttyVIRT_DDS`：
 
@@ -103,12 +109,13 @@ sudo systemctl daemon-reload && sudo systemctl enable --now skybridge
 
 ## 脚本说明
 
+- `build.sh`：统一构建第三方依赖，并把生成的可执行文件放在 `build/bin/`。
 - `scripts/bridge_control.sh`：通过 `start|stop|status|toggle|restart` 管理 `mavlink-routerd` 和 `socat`，并打印当前进程状态。
-- `scripts/build_mavlink_router.sh`：在子模块 `thirdparty/mavlink-router` 中运行 Meson/Ninja 构建，可通过 `MAVLINK_ROUTER_REF` 指定 ref，并输出 `build/src/mavlink-routerd` 供 `scripts/bridge_control.sh` 使用。
+- `scripts/ser2net_bridge.sh`：在伴随计算机上启动/停止 RFC2217 隧道，让 `/dev/ttyUSB0` 可被远端 remserial 使用。
 - `scripts/test_udp_connection.sh`：Python 3 脚本，向 UDP 14550 发一个握手再监听 15 秒，将收到的 MAVLink 报文以十六进制打印出来，便于验证 UDP 流。
 
 使用前请将脚本设为可执行：
 
 ```bash
-chmod +x scripts/bridge_control.sh scripts/build_mavlink_router.sh scripts/test_udp_connection.sh
+chmod +x build.sh scripts/bridge_control.sh scripts/ser2net_bridge.sh scripts/test_udp_connection.sh
 ```

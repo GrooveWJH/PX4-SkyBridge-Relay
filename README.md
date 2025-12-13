@@ -1,5 +1,8 @@
 # PX4 SkyBridge Relay
 
+[![Build amd64](https://img.shields.io/github/actions/workflow/status/GrooveWJH/PX4-SkyBridge-Relay/build.yml?branch=main&label=amd64)](https://github.com/GrooveWJH/PX4-SkyBridge-Relay/actions/workflows/build.yml)
+[![Build arm64](https://img.shields.io/github/actions/workflow/status/GrooveWJH/PX4-SkyBridge-Relay/build.yml?branch=main&label=arm64)](https://github.com/GrooveWJH/PX4-SkyBridge-Relay/actions/workflows/build.yml)
+
 PX4 SkyBridge Relay documents how to operate a companion computer as a transparent network bridge between a PX4 autopilot and other hosts on the LAN. The companion computer exposes the USB CDC (MAVLink) interface as an outbound UDP service and tunnels the UART interface over TCP so that remote agents can interact with the PX4 serial endpoints without direct physical access.
 
 ## Architecture
@@ -21,15 +24,16 @@ sudo apt install git meson ninja-build pkg-config gcc g++ systemd socat
 
 Ensure the local user belongs to the `dialout` group so it can open `/dev/ttyACM0` and `/dev/ttyUSB0` without elevated privileges.
 
-## Building `mavlink-router` from source
+## Building the bundled executables
 
-Use `scripts/build_mavlink_router.sh` to compile the code stored inside the `thirdparty/mavlink-router` submodule. The script respects an optional `MAVLINK_ROUTER_REF` and runs Meson/Ninja via that workspace:
+Run the repository-level `./build.sh` to compile every third-party binary the project relies on (`mavlink-routerd`, `ser2net`, and `remserial`). The script initializes the required submodules, builds everything under `build/`, and copies the final executables into `build/bin/`:
 
 ```bash
-scripts/build_mavlink_router.sh
+./build.sh
+ls build/bin
 ```
 
-Set `DEST` or `MAVLINK_ROUTER_REF` before invoking the script if you need to override the repository location or build tag. The script prints the path to the compiled binary (default `build/mavlink-router/src/mavlink-routerd`). Run that binary with `-c /path/to/config/main.conf` to verify its endpoints; `scripts/bridge_control.sh` already defaults to that build location unless you override `MAVLINK_ROUTER_BIN`.
+`scripts/bridge_control.sh` automatically points to `build/bin/mavlink-routerd`, while `scripts/ser2net_bridge.sh` uses `build/bin/ser2net`. Re-run the build script whenever you update the submodules or change platforms.
 
 ## Configuration reference (`config/main.conf`)
 
@@ -76,8 +80,10 @@ On any remote Linux host that consumes PX4’s UART data:
 1. Create a pseudo-terminal linked to the companion computer’s TCP tunnel (replace `<COMPANION_IP>` with the actual LAN IP):
 
 ```bash
-socat PTY,link=/tmp/ttyVIRT_DDS,raw,echo=0 TCP:<COMPANION_IP>:8888
+socat PTY,link=/tmp/ttyVIRT_DDS,raw,echo=0,waitslave TCP:<COMPANION_IP>:8888,tcp-nodelay
 ```
+
+`waitslave` waits until the PTY is opened by the agent, and `tcp-nodelay` mirrors the companion’s tunnel configuration to reduce buffering so XRCE-DDS frames arrive as intact as possible.
 
 2. Run `MicroXRCEAgent` (or other DDS client) pointing to the newly created device:
 
@@ -107,14 +113,13 @@ The unit is configured as a forking service so it can manage the background `soc
 
 ## Scripts
 
-## Scripts
-
+- `build.sh`: orchestrates all third-party builds and places the resulting executables inside `build/bin/`.
 - `scripts/bridge_control.sh`: manages the MAVLink router and `socat` tunnel with `start|stop|status|toggle|restart` arguments, printing each PID and current state.
-- `scripts/build_mavlink_router.sh`: clones the upstream GitHub repository (`https://github.com/mavlink-router/mavlink-router.git`), checks out the pinned ref, and builds the binary with Meson/Ninja.
+- `scripts/ser2net_bridge.sh`: supervises the RFC2217 tunnel (`ser2net`) that mirrors `/dev/ttyUSB0` onto the LAN for `remserial`.
 - `scripts/test_udp_connection.sh`: sends a MAVLink hello to UDP 14550 and listens for replies for 15 seconds (Python 3 is required) to confirm the router is broadcasting.
 
-Make the scripts executable before use:
+Make the helper scripts executable before use:
 
 ```bash
-chmod +x scripts/bridge_control.sh scripts/build_mavlink_router.sh scripts/test_udp_connection.sh
+chmod +x build.sh scripts/bridge_control.sh scripts/ser2net_bridge.sh scripts/test_udp_connection.sh
 ```
