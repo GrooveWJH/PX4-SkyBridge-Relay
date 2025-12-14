@@ -5,8 +5,8 @@ PX4 SkyBridge Relay documents how to operate a companion computer as a transpare
 ## Architecture
 
 - **MAVLink channel**: the companion computer routes `/dev/ttyACM0` (the PX4 USB CDC interface) through `mavlink-routerd`, which listens for MAVLink packets and forwards them as UDP server traffic on port `14550`. This allows ground control stations on the same network to receive heartbeats and send control messages without touching the flight controller’s USB connection.
-- **Serial-over-TCP tunnel**: `/dev/ttyUSB0` typically carries the PX4-side Micro XRCE-DDS stream; `scripts/bridge_control.sh` launches a dedicated `socat` process that listens on TCP port `8888` and forwards those raw bytes so any downstream TCP-capable XRCE Agent can treat the link as a serial transport.
-- **Serial-over-TCP tunnel**: `/dev/ttyUSB0` typically carries DDS or `nsh` data from PX4. `scripts/bridge_control.sh` (via its `start` command) runs `socat` to expose that UART on TCP port `8888`, preserving the raw byte stream and enabling remote hosts to recreate it as a pseudo-terminal.
+- **Serial-over-TCP tunnel**: `/dev/ttyUSB0` typically carries the PX4-side Micro XRCE-DDS stream; `bridge_control.sh` launches a dedicated `socat` process that listens on TCP port `8888` and forwards those raw bytes so any downstream TCP-capable XRCE Agent can treat the link as a serial transport.
+- **Serial-over-TCP tunnel**: `/dev/ttyUSB0` typically carries DDS or `nsh` data from PX4. `bridge_control.sh` (via its `start` command) runs `socat` to expose that UART on TCP port `8888`, preserving the raw byte stream and enabling remote hosts to recreate it as a pseudo-terminal.
 
 ## Requirements
 
@@ -23,7 +23,7 @@ Ensure the local user belongs to the `dialout` group so it can open `/dev/ttyACM
 
 ## Building `mavlink-router` from source
 
-Run the repository-level build helper to compile the `thirdparty/mavlink-router` submodule with Meson/Ninja. The script places the binary in `build/bin/mavlink-routerd`, which `scripts/bridge_control.sh` uses by default:
+Run the repository-level build helper to compile the `thirdparty/mavlink-router` submodule with Meson/Ninja. The script places the binary in `build/bin/mavlink-routerd`, which `bridge_control.sh` uses by default:
 
 ```bash
 ./build.sh
@@ -54,16 +54,16 @@ Port = 14550
 - `[UartEndpoint px4_usb]`: names the PX4 USB CDC device and configures the baud rate. You can duplicate this block if additional UARTs should be exposed through the router.
 - `[UdpEndpoint qgc_lan]`: defines the UDP server that listens on all interfaces and waits for incoming ground station connections on port `14550`. `Mode = Server` ensures the companion computer answers the first client that connects and keeps relaying MAVLink data to that socket.
 
-For `/dev/ttyUSB0`, `scripts/bridge_control.sh` (start command) creates a raw TCP endpoint (`TCP 8888`) via `socat`. Remote hosts can connect to that port, optionally re-encapsulate it as UDP if needed, or simply expose it locally as a pseudo-serial device before feeding the stream into DDS or `nsh`. The MAVLink router remains responsible for UDP streaming of `/dev/ttyACM0`, while the `socat` tunnel keeps the UART traffic untouched and available on the LAN.
+For `/dev/ttyUSB0`, `bridge_control.sh` (start command) creates a raw TCP endpoint (`TCP 8888`) via `socat`. Remote hosts can connect to that port, optionally re-encapsulate it as UDP if needed, or simply expose it locally as a pseudo-serial device before feeding the stream into DDS or `nsh`. The MAVLink router remains responsible for UDP streaming of `/dev/ttyACM0`, while the `socat` tunnel keeps the UART traffic untouched and available on the LAN.
 
-Additional endpoint sections can be appended if you want to multicast to multiple UDP clients or mix in TCP connections. Any changes to this file will be honored the next time `scripts/bridge_control.sh` launches the router.
+Additional endpoint sections can be appended if you want to multicast to multiple UDP clients or mix in TCP connections. Any changes to this file will be honored the next time `bridge_control.sh` launches the router.
 
 ## Companion computer setup (server)
 
 1. Adjust `/etc/mavlink-router/main.conf` if needed (use `config/main.conf` as guidance).
-2. Manage the relay with `scripts/bridge_control.sh`:
-   - `./scripts/bridge_control.sh start` launches `mavlink-routerd` (using the repo config if `/etc/mavlink-router/main.conf` is missing) and starts the `socat` tunnel.
-   - `./scripts/bridge_control.sh stop` kills both services; `status` and `toggle` are also available.
+2. Manage the relay with `bridge_control.sh`:
+   - `./bridge_control.sh start` launches `mavlink-routerd` (using the repo config if `/etc/mavlink-router/main.conf` is missing) and starts the `socat` tunnel.
+   - `./bridge_control.sh stop` kills both services; `status` and `toggle` are also available.
 3. For persistent deployments, copy `systemd/skybridge.service` into `/etc/systemd/system`, adjust the paths, and enable the service so the bridge starts automatically on boot.
 
 Logs:
@@ -109,11 +109,11 @@ The unit is configured as a forking service so it can manage the background `soc
 ## Scripts
 
 - `build.sh`: compiles `thirdparty/mavlink-router` (Meson/Ninja) and copies the resulting `mavlink-routerd` into `build/bin/`.
-- `scripts/bridge_control.sh`: manages the MAVLink router and `socat` tunnel with `start|stop|status|toggle|restart` arguments, printing each PID and current state.
+- `bridge_control.sh`: manages the MAVLink router and `socat` tunnel with `start|stop|status|toggle|restart` arguments, printing each PID and current state.
 - `scripts/test_udp_connection.sh`: sends a MAVLink hello to UDP 14550 and listens for replies for 15 seconds (Python 3 is required) to confirm the router is broadcasting.
 
 Make the helper scripts executable before use:
 
 ```bash
-chmod +x build.sh scripts/bridge_control.sh scripts/test_udp_connection.sh
+chmod +x build.sh bridge_control.sh scripts/test_udp_connection.sh
 ```
