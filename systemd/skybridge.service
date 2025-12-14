@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/home/groove/work/PX4-SkyBridge-Relay
-ExecStart=/usr/bin/env bash /home/groove/work/PX4-SkyBridge-Relay/scripts/bridge_supervisor.sh
+ExecStart=/usr/bin/env bash /home/groove/work/PX4-SkyBridge-Relay/bridge_control.sh supervise
 Restart=always
 RestartSec=3
 
